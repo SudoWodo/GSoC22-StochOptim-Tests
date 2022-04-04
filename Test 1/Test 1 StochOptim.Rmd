@@ -1,0 +1,240 @@
+---
+title: "Test 1"
+author: "Siddhant Raghuvanshi"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries Required
+```{r Library to include}
+library(rgl)
+options(rgl.printRglwidget = TRUE)
+```
+
+## Visualization function
+```{r Visualization function to plot 2D graphs}
+visualize3D <- function(fname ,range){
+  
+  x<- y<- seq(-range,range,length = 100)
+  data<-data.matrix(expand.grid(x,y))
+
+  
+  `f(x,y)`<-matrix(apply(data,1,fname),
+             nrow = length(x),
+             ncol = length(y))
+  
+  div<-100
+  color <- rev(rainbow(div))
+  zcol <- cut(`f(x,y)`, div)
+  
+  persp3d(x,y,`f(x,y)` , col = color[zcol])
+}
+
+```
+
+## 1) Ackley Function 
+
+### 1.1) Equation of Ackley function
+$$
+f(x) = -a\,exp \left(-b\,\sqrt{\frac{1}{d} \sum_{i=1}^{d}{x_i^2}}\right)-
+\,exp\left(-b\,{\frac{1}{d} \sum_{i=1}^{d}{cos(cx_i)}}\right) +
+\,a+\,exp(1)
+$$
+
+### 1.2) R implementation of Ackley function
+
+```{r Ackley function}
+ackley<-function(x,a=20, b=0.2 , c =2*pi){
+  d <- length(x)
+  
+  sum1 <- sum(x^2)
+  sum2 <- sum(cos(2*pi*x))
+  
+  term1 <- -a * exp(-b*sqrt(sum1/d))
+  term2 <- -exp(sum2/d)
+  
+  y <- term1 + term2 + a + exp(1)
+  return(y)
+}
+
+```
+### 1.3) Ackley function visualization
+```{r Ackley function visualization}
+visualize3D(ackley,32)
+```
+
+
+## 2) Zakharov Function
+
+### 2.1) Equation of Zakharov Function
+
+$$
+Z_n(x) = \sum_{i=1}^{n}{x_i^2} + \left(\sum_{i=1}^{n}{0.5ix_i}\right)^2 + 
+\left(\sum_{i=1}^{n}{0.5ix_i}\right)^4 
+$$
+
+### 2.2) R implementation of Zakharov function
+
+```{r zakharov function}
+zakharov <- function(x){
+  
+  term1 <-sum(x^2)
+  i <-seq_along(x)
+  term2 <- sum(i*0.5*(x))
+  
+  y <- term1 + term2^2 + term2^4
+  return(y)
+}
+```
+
+### 2.3) Visulization of Zakharov function
+```{r Visulization of Zakharov function}
+visualize3D(zakharov,10)
+```
+
+## 3) Dixon-price function
+
+### 3.1) Dixon-price function equation
+$$
+f(x) = (x_1 - 1)^2 +\sum_{i=2}^{n}{i(2x_i^2-x_{i-1})^2}
+$$
+
+### 3.2) R implementation of Dixon-price function
+
+```{r Dixon-price function}
+dixon <- function(x){
+  
+  term1 <-(x[1]-1)^2
+  
+  # computation of sum starts from i = 2 thus taking lag befor removing values
+  d <- length(x)-1
+  xlag <- x[1:d]
+  
+  x <- x[-1]
+  i <- seq_along(x)+1
+  
+  term2 <- sum(i*(2*x^2 - xlag)^2 ) 
+  
+  y <- term1 + term2
+  
+  return(y)
+  
+}
+```
+### 3.3) Dixon-price function visulization
+```{r Dixon-price function visulization}
+visualize3D(dixon,10)
+```
+
+## 4) Griewank function
+### 4.1) Griewank function equation
+$$
+f(x) = \sum_{i=n}{n}\frac{x_i^2}{4000}-
+\prod_{i=1}^{n}cos\left(\frac{x_i}{\sqrt{i}}\right)+1
+$$
+
+### 4.2) R implementation of Griewank function
+
+```{r Griewank function}
+
+griewank <- function(x,y){
+  term1 <- sum(x^2)
+  term2 <- prod(cos(x)/seq_along(x))
+  y <- 1 + (1/4000 * term1) - term2
+  
+  return(y)
+}
+
+```
+### 4.3) Visulization of Griewank function
+```{r Visulization of Griewank function}
+visualize3D(griewank,100)
+```
+
+## 5) Michalewicz Function
+### 5.1) Michalewicz Function equation
+$$
+f(x) = - \sum_{i=1}^{d}sin(x_i){sin^{2m}\left(\frac{ix_i^2}{\pi}\right)}
+$$
+
+### 5.2) R implementation of Griewank function
+
+```{r Michalewicz Function}
+michale <- function(x,m=10){
+  
+  d <- length(x)
+  i <- seq_along(x)
+  
+  sum <- sum(sin(x) * (sin(i*x^2/pi))^(2*m))
+  
+  y <- sum
+  return(-y)
+}
+
+# new
+visualize3D(michale,4)
+```
+## 6) Perm $P_{n,\beta}$ Function
+### 6.1) Equation of Perm $P_{n,\beta}$ Function 
+$$
+f(x)=\sum_{i=1}^{d}{
+\left(\sum_{j=1}^{d}{(j^i+\beta)}
+  \left({\left({\frac{x_j}{j}}\right)^i}-1\right)
+\right)^2}
+$$
+
+
+### 6.2) R implementation of Perm $P_{n,\beta}$ Function 
+
+```{r Prem}
+
+perm <- function(x, b=0.5){
+  
+  d <- length(x)
+  ii <- c(1:d)
+  jj <- matrix(rep(ii,times=d), d, d, byrow=TRUE)
+  
+  xxmat <- matrix(rep(x,times=d), d, d, byrow=TRUE)
+  inner <- rowSums((jj^ii+b)*((xxmat/jj)^ii-1))	
+  outer <- sum(inner^2)
+  
+  y <- outer
+  return(y)
+}
+
+```
+
+### 6.3) Visulization of Perm $P_{n,\beta}$ Function
+```{r}
+visualize3D(perm , 2)
+```
+
+
+## 7) Rastrigin Function 
+### 7.1) Equation of Rastrigin Function 
+
+$$
+f(x) = 10d + \sum_{i=1}^{d}[x_i^2 -10cos(2\pi x_i)]
+$$
+
+
+### 7.2) R implementatin of Rastrigin Function
+
+```{r Rastrigin Function}
+
+rastrigin <- function(x) {
+  y <- 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+  return(y)
+}
+
+```
+
+
+### 7.3) Visulization of of Rastrigin Function
+```{r Rastrigin Function Visulization}
+visualize3D(rastrigin,5)
+```
+
