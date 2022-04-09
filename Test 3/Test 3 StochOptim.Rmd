@@ -1,0 +1,142 @@
+---
+title: "Test 3"
+author: "Siddhant Raghuvanshi"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1) Library
+```{r Libraries}
+library(optimr)
+```
+## 2) TestMethod from test 2
+`testMethod()` is same from test 2 but <b> with `optimr()` function instead of `optim()` </b>. It takes parameter for the function and the 
+function itself for which we wish to calculate minima and then it evaluates minima using `optimr()` along with that it prints a table containing 
+the output. The motivation for this function is to compare various solvers at once.  
+
+<b>By running the `testMethod()` function we can see that code from test 2 works with `optimr()` wrapper.</b>
+```{r}
+testMethod <- function(val,fname){
+  
+  method = c("Nelder-Mead", "BFGS", "CG", "L-BFGS-B", "SANN")
+  
+  table<-NULL
+  cat("Values for point: ",val,"\n\n")
+  
+  for (i in method){
+    opt<- optim(val,fname,method = i)
+    parameter<-opt$par
+    
+    # need to find a better way to pass a variable no. of parameters possibly with purrr?
+    # at current state only shows up to 4 parameters.
+    row<- cbind(Method=i, Parameter1 = opt$par[1], Parameter2 = opt$par[2],Parameter3 = opt$par[3],Parameter4 =opt$par[4],
+                value = opt$value,convergence = opt$convergence )
+    table<-rbind(table,row)
+  }
+
+  print(table)
+  cat("\n\n")
+}
+```
+
+# Optimizing the test functions
+In this exercise we are tasked with justifying the choice of solver used for each problem thus I first selected some function at 
+random from test 1 and researched about them in order to make a better choice selecting the solvers. The choice of solver will depend 
+on some features of function like modality, separability, scalability.
+
+## 2) Ackley Function
+The function poses a risk for optimization algorithms, particularly hill-climbing algorithms, to be trapped in one of its many local minima.
+Ackley's function in it's 2D form exhibits a steep guiding slope towards the global optimum, which is located in the center. 
+The function contains many local optima, which can mislead local gradient based methods [1]. Any search strategy that analyzes a wider region 
+will be able to cross the valley among the optima and achieve better results. In order to obtain good results for this function, the search 
+strategy must combine the exploratory and exploitative components efficiently.[2]
+
+After reading a bit about this problem I decided to use Hooke and Jeeves pattern search (hnj). In Ackley the value decreases steeply in the 
+middle so it seems gradient based methods may be able to navigate through it thus I selected CG where the search directions are not specified 
+beforehand, but rather are determined sequentially at each step of the iteration based on gradient. Rcgmin was also used as a solver as it is 
+a better version of conjugate gradient in `opm()`. I also decided to use BFGS and its more sophisticated version L-BFGS-B which are Quasi-Newton 
+methods that approximate the second derivative (called the Hessian) and work with that information to find optimums.
+
+```{r Ackley}
+ackley<-function(x,a=20, b=0.2 , c =2*pi){
+  d <- length(x)
+  
+  sum1 <- sum(x^2)
+  sum2 <- sum(cos(2*pi*x))
+  
+  term1 <- -a * exp(-b*sqrt(sum1/d))
+  term2 <- -exp(sum2/d)
+  
+  y <- term1 + term2 + a + exp(1)
+  return(y)
+}
+
+testMethod(rep(1,4),ackley)
+(opm(rep(1,4),ackley,method = c("hjn","BFGS","L-BFGS-B","CG","Rcgmin")))
+```
+- Surprisingly the CG Algorithm here comes out to be better than Rcgmin which in other cases often performs better than CG.
+- Quasi-newton method like BFGS performed extremely well but it's lower memory consuming counter (L-BFGS-B) part did not perform as well.
+- hnj which is short for Hooke and Jeeves pattern search also did exceedingly well as i had hoped.
+- <b>Notably all the solvers except hnj does not produce good results with more dimensions or with parameters further from minima.</b>
+
+## 2) Rastrigin function 
+The Rastrigin function has several local minima. It is highly multimodal, but locations of the minima are regularly distributed. [3]
+
+As location of various minima in this function is regularly distributed I believe pattern search methods i.e hjn should find good solutions. 
+As this function is a highly multimodal, solvers such as CG and Rcgmin will not be a good fit here so I picked non-linear solvers nlm and nlminb 
+instead as Rastrigin function is non-linear. I also included BFGS and L-BFGS-B to see if quasi-newton methods will be effective.
+```{r}
+rastrigin <- function(x) {
+  y <- 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+  return(y)
+}
+
+testMethod(rep(5,23),rastrigin)
+(opm(rep(5,23),rastrigin,method = c("hjn","nlm","nlminb","BFGS","L-BFGS-B")))
+```
+
+- unconstrained nonlinear optimization solver nlm performs exceedingly well in this test with just two calls to computed gradient but 
+- nlminb did not do well at all.
+- Quasi-newton menthod BFGS also did very well but more sophisticated method L-BFGS-B did not.
+- pattern based search hjn also provided correct solution but with high number of function calls.
+
+## 3) The Michalewicz function
+Michalewicz function is a multimodal test function and has n! local optima. The parameter m in the function defines the "steepness" of 
+the valleys or edges. Larger m leads to more difficult search.For very large m the function behaves like a needle in the haystack (the 
+function values for points in the space outside the narrow peaks give very little information on the location of the global optimum). 
+Michalewicz function is separable in nature[4]
+
+For optimizing Michalewicz function I used pattern search (hjn) as Michalewicz function does not give much gradient information to work 
+with for high values of m (see code below) and many of the slopes produced by the function lead to local minima. I decided to use CG as 
+it a simple method uses less space and apart from that sometimes gives surprisingly well results for some high dimensional problems, i 
+also included a better version of CG i.e. Rcgmin. Having obtained good results from nlm in above problem I decided to include it here. 
+I also included BFGS, L-BFGS-B and Rvmmin since they are a important class of solvers although I expect them to get stuck in some local 
+minima guessing by the 2D visualization of this function.
+```{r}
+michalewicz <- function(x,m=10){
+
+d <- length(x)
+i <- seq_along(x)
+
+y<- sum(sin(x) * (sin(i*x^2/pi))^(2*m))
+return(-y)
+}
+
+(opm(rep(1,10),michalewicz,method = c("hjn","CG","Rcgmin","BFGS","L-BFGS-B","Rvmmin")))
+```
+for this function minima is at -9.6605 for 10 dimensional input.
+- in optimizing this function nlm gave error by printing non-finite value supplied by 'nlm' and supplied convergence code 9999 which i couldn't find with help function in Rstudio.
+- hjn reached very close to the final solution albeit but with a large number of function calls.
+- BFGS gave a reasonable solution but it's counterpart L-BFGS-B reached to essentially the same solution but with less function calls.
+- Rvmmin did not reach close to the final answer and produced convergence code 3 which upon searching is not contained in the help documentation accessible from within Rstudio. Taking my search to internet i found the following description from the comments written with Rvmmin code : '3' indicates approx. inverse Hessian cannot be updated at steepest descent iteration (i.e., something very wrong)
+
+## 4) Refrences 
+
+1. https://www.sfu.ca/~ssurjano/ackley.html
+2. https://www.cs.cmu.edu/afs/cs/project/jair/pub/volume24/ortizboyer05a-html/node6.html
+3. https://www.sfu.ca/~ssurjano/rastr.html
+4. http://www.geatbx.com/ver_3_3/fcnfun12.html
+
