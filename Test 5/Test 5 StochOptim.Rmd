@@ -1,0 +1,78 @@
+---
+title: "Test 5"
+author: "Siddhant Raghuvanshi"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1) Libraries Used
+
+Before running the codes for visualization it is necessary to install and load the below mentioned library.
+
+```{r Library to include}
+library(rgl)
+options(rgl.printRglwidget = TRUE)
+```
+
+
+## 2) Visualizing Function Description
+
+Draws a 3D plot of function in the range of -r to r. It generates common range for x and y axis for some given number r.
+
+```{r Visualizing the function in 3D plots}
+visualize3D <- function(fname ,range){
+  
+  x<- y<- seq(-range,range,by=0.2,)
+  data<-data.matrix(expand.grid(x,y))
+
+  
+  z<-matrix(apply(data,1,fname),
+             nrow = length(x),
+             ncol = length(y))
+  
+  div<-100
+  color <- rev(rainbow(div))
+  zcol <- cut(z, div)
+  
+  persp3d(x,y,z , col = color[zcol])
+}
+
+```
+
+## 3) Volcano Function
+```{r Volcano Function}
+mynorm<- function(b){
+  v<-c(1,5)
+  ans <- sum((b-v)^2)
+
+  return(ans)
+}
+
+volcano<- function(b){
+
+  d<-mynorm(b)
+  f = (10 - 0.5*d) + sin(2*d)
+  
+  return(f)
+}
+
+visualize3D(volcano,40)
+```
+
+## 4) Optimization of volcano function 
+
+```{r}
+library(optimr)
+optim(c(3,3),volcano)
+
+# for 3,3 Rvmmin gives error saying too many gradient evaluation
+result<-opm(c(3,2), volcano, method=c("L-BFGS-B", "Nelder-Mead", "CG", "Rcgmin", "Rvmmin","BFGS"))
+print(result)
+```
+
+# 5) Problem with optimizing 2D functions
+A 2D functions in general would be written as z = f(x,y) where x, y are independent variable and z is dependent variable. The graph of this function would be a surface in 3D. This surface can have maxima or minima or both but for these surfaces there is a third possibility called a saddle point or minimax point where the slope in orthogonal direction is zero and this point is neither a mixima nor minima. If the the critical point obtained for a function is a saddle point it needs analysis analysis to conclude if it's an optima. Upon double partially double differentiating volcano function the critical obtained are saddle point.This the algorithms in opm() have difficulty in finding the correct solution.
+
