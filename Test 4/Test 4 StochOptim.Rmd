@@ -1,0 +1,129 @@
+---
+title: "Test 4"
+author: "Siddhant Raghuvanshi"
+output: html_document
+---
+# 1) Libraries 
+```{r Library}
+library(GenSA)
+suppressPackageStartupMessages(library(RcppDE))
+library(metaheuristicOpt)
+library(nloptr)
+```
+
+# 2) Issues while setting up
+### 2.1) nloptr 
+- requires CMake on linux so, had to install that through terminal (it was easy to install).
+- nloptr cannot detect default arguments declared with the function and thus these arguments need to be pass separately.
+- No algorithm is choosen by default thus we have to explicitly choose an algorithm from their web page.
+- It also raised an error when parameters passed were larger than upper bound provided where as other packages did not raise any such error for same parameter.
+- raised Error in opts.user[[name]] : subscript out of bounds which i could not figure out.
+          
+- <b>Because of many errors, exceptions and constantly being referred to nloptr website  i was not able to use this library effectively.</b>
+
+### 2.2) metahuristicOpt 
+- Needs a matrix for upper and lower bound which is quite different from other packages.
+- Output of `metaOpt` is unusual in Rmarkdown i.e. a progress bar is printed incrementally wasting space of 100 lines.
+
+### 2.3) RcppDE 
+- Gives a very big output unless the output is stored in a variable. I cannot find a way to shorten this output from control options like we can from GenSA.
+
+### 2.4) rgenoud -
+- it is not available for R 4.1 so couldn't install that.
+
+
+# 3) Package discription
+## 3.1) RcppDE
+Differential Evolution (DE) is a search heuristic introduced by Storn and Price (1997). DE is particularly well-suited to find the global optimum of a real-valued function of real-valued parameters, and does not require that the function be either continuous or differentiable. It is therefore useful in situations in which the objective function is stochastic,noisy, or difficult to differentiate.[1] RcppDE is Rcpp implementation of DEoptim.
+
+## 3.2) Metahuristic
+Metaheuristic algorithms are search procedure designed to find, a good solution to an optimization problem that is complex and difficult to solve to optimality. Many optimization problems are multi-objective functions with non-linear constraints. Meta heuristics can often find good solutions with less computational effort than optimization algorithms. Also `metahuristicOpt` has a good number of algorithm in its library like Particle Swarm Optimization (PSO) and Artificial Bee Colony (ABC) among other. [2]
+
+## 3.3) GenSA
+R package GenSA, is an implementation of modified generalized simulated annealing, which outperforms the classical simulated annealing algorithm. GenSA can process complicated
+non-linear objective functions with a large number of local minima. Generalized SA not only converges faster than Fast SA (FSA)and Classical SA (CSA), but also has the ability to escape
+from a local minimum more easily than FSA and CSA. It is also better than `SANN of optim`. [3]
+
+## 3.4) nlopr
+NLopt is a free/open-source library for nonlinear optimization which has been implemented in many languages. It provides a common interface for a number of different free optimization routines available online as well as original implementations of various other algorithms, thus I decided to use it. `nlopr` offer algorithms using function values only (derivative-free) and also algorithms exploiting user-supplied gradients, it also has algorithms for unconstrained optimization, bound-constrained optimization, and general nonlinear with inequality/equality constraints.[4]
+
+# 4) Function Optimization
+## 4.1) Optimizing Ackley function
+```{r} 
+ackley<-function(x,a=20, b=0.2 , c =2*pi){
+  d <- length(x)
+  
+  sum1 <- sum(x^2)
+  sum2 <- sum(cos(2*pi*x))
+  
+  term1 <- -a * exp(-b*sqrt(sum1/d))
+  term2 <- -exp(sum2/d)
+  
+  y <- term1 + term2 + a + exp(1)
+  return(y)
+}
+
+diminsion<-10
+lower_bound<-rep(-5,diminsion)
+upper_bound<-rep(5,diminsion)
+parameter<-rep(23,diminsion)
+```
+### 4.1.2) GenSA
+```{r}
+GenSA(parameter,ackley,lower = lower_bound, upper = upper_bound, control=list(verbose = FALSE, trace.mat = FALSE))
+```
+
+### 4.1.3) RcppDE
+```{r}
+ansDEopt<-DEoptim(ackley,lower = lower_bound , upper = upper_bound, control=list(strategy = 2,trace = 20, NP = 100))
+```
+
+### 4.1.4) nloptr
+```{r}
+nloptr(x0 = lower_bound,eval_f =ackley, lb =lower_bound , ub = upper_bound ,opts = list(algorithm ="NLOPT_GN_ESCH") ,a=20 , b =0.2, c= 2*pi)
+# code below gives error - as of yet can't figure out why
+# nloptr(x0 = upper_bound,eval_f =ackley, lb =lower_bound , ub = upper_bound ,opts = list(algorithm ="NLOPT_GN_MLSL_LDS", local_opts ="NLOPT_LN_AUGLAG", xtol_rel = 1e-5) ,a=20 , b =0.2, c= 2*pi)
+
+```
+
+### 4.1.5) metaOpt
+```{r}
+range<-matrix(c(lower_bound,upper_bound),nrow = 2, byrow = TRUE)
+metaOpt(ackley,optimType = "MIN", algorithm = "ABC", numVar = diminsion, rangeVar = range)
+```
+
+## 4.2) Optimizing Ackley function
+```{r}
+rastrigin <- function(x) {
+  y <- 10 * length(x) + sum(x^2 - 10 * cos(2 * pi * x))
+  return(y)
+}
+```
+### 4.2.1) GenSA
+```{r}
+GenSA(parameter,rastrigin,lower = lower_bound, upper = upper_bound, control=list(verbose = FALSE , trace.mat = FALSE))
+```
+
+### 4.2.2) RcppDE
+```{r}
+M<-DEoptim(rastrigin,lower = lower_bound , upper = upper_bound, control=list(strategy = 3,trace = 20, NP = 100))
+```
+
+### 4.2.3) nloptr
+```{r}
+nloptr(x0 = upper_bound,eval_f =rastrigin, lb =lower_bound , ub = upper_bound ,opts = list(algorithm = "NLOPT_LN_COBYLA"))
+```
+
+### 4.2.4) metaOpt
+```{r}
+range<-matrix(c(lower_bound,upper_bound),nrow = 2, byrow = TRUE)
+# PSO gave better result than ABC
+a<-metaOpt(rastrigin,optimType = "MIN", algorithm = "PSO", numVar = diminsion, rangeVar = range)
+```
+
+# Refrence
+1. Differential Evolution with DEoptim by David Ardia, Kris Boudt, Peter Carl, Katharine M. Mullen and Brian G. Peterson - 
+https://journal.r-project.org/archive/2011/RJ-2011-005/RJ-2011-005.pdf
+2. Metaheuristics in Optimization: Algorithmic Perspective by Srinivasan Balan North Carolina State University - https://www.informs.org/Publications/OR-MS-Tomorrow/Metaheuristics-in-Optimization-Algorithmic-Perspective
+3. Generalized Simulated Annealing for Global Optimization: The GenSA Package by Yang Xiang, Sylvain Gubian, Brian Suomela and Julia Hoeng- https://journal.r-project.org/archive/2013-1/xiang-gubian-suomela-etal.pdf
+4. NLopt Documentation - https://nlopt.readthedocs.io/en/latest/
